@@ -25,14 +25,16 @@ var hasParams = function (pathRegexp) {
 }
 
 /**
- * @param {Object} route Express route object to be parsed
- * @param {string} basePath The basePath the route is on
+ * @param {string} routePath Express route path
+ * @param {string[]} methods The methods for this route
+ * @param {string} middleWare middleWare on this route
  * @return {Object} Endpoint info
  */
-var parseExpressRoute = function (route, basePath) {
+var entry = function (routePath, methods, middleWare) {
   return {
-    path: basePath + (basePath && route.path === '/' ? '' : route.path),
-    methods: getRouteMethods(route)
+    path: routePath,
+    methods,
+    middleWare
   }
 }
 
@@ -62,16 +64,23 @@ var parseEndpoints = function (app, basePath, endpoints) {
   basePath = basePath || ''
 
   stack.forEach(function (stackItem) {
+    var routePath;
     if (stackItem.route) {
-      endpoints.push(parseExpressRoute(stackItem.route, basePath))
-    } else if (stackItem.name === 'router' || stackItem.name === 'bound dispatch') {
-      if (regexpExpressRegexp.test(stackItem.regexp)) {
-        var parsedPath = parseExpressPath(stackItem.regexp, stackItem.keys)
+      routePath = basePath + (basePath && stackItem.route.path === '/' ? '' : stackItem.route.path);
+    } else if (regexpExpressRegexp.test(stackItem.regexp)) {
+      routePath = basePath + '/' + parseExpressPath(stackItem.regexp, stackItem.keys);
+    } else {
+      routePath = basePath;
+    }
 
-        parseEndpoints(stackItem.handle, basePath + '/' + parsedPath, endpoints)
-      } else {
-        parseEndpoints(stackItem.handle, basePath, endpoints)
-      }
+    if (stackItem.route) {
+      endpoints.push(entry(routePath, getRouteMethods(stackItem.route)));
+      // console.log('route', routePath, basePath, stackItem.name);
+    } else if (stackItem.name === 'router' || stackItem.name === 'bound dispatch') {
+      parseEndpoints(stackItem.handle, routePath, endpoints)
+    } else {
+      // console.log('middleWare', routePath, stackItem.name === '<anonymous>' ? stackItem.handle : stackItem.name );
+      endpoints.push(entry(routePath, [], stackItem.name));
     }
   })
 
