@@ -58,14 +58,16 @@ var parseExpressPath = function (expressPathRegexp, params) {
 }
 
 var parseEndpoints = function (app, basePath, endpoints) {
-  var stack = app.stack || (app._router && app._router.stack)
+  var stack = app.stack || (app._router && app._router.stack);
+  console.log('stack', stack);
+  app.route && console.log('route.stack', app.route.stack);
 
   endpoints = endpoints || []
   basePath = basePath || ''
+  var middleWare = [], hasRoute = false;
 
-  let stackRoute = undefined;
+  var routePath;
   stack.forEach(function (stackItem) {
-    var routePath;
     if (stackItem.route) {
       routePath = basePath + (basePath && stackItem.route.path === '/' ? '' : stackItem.route.path);
     } else if (regexpExpressRegexp.test(stackItem.regexp)) {
@@ -73,22 +75,24 @@ var parseEndpoints = function (app, basePath, endpoints) {
     } else {
       routePath = basePath;
     }
+    console.log('stackItem', routePath, JSON.stringify(stackItem, null, 2));
 
     if (stackItem.route) {
-      stackRoute = entry(routePath, getRouteMethods(stackItem.route));
-      endpoints.push(stackRoute);
-      // console.log('route', routePath, basePath, stackItem.name);
+      endpoints.push(entry(routePath, getRouteMethods(stackItem.route), middleWare));
+      parseEndpoints(stackItem.route, routePath, endpoints);
+      hasRoute = true;
+      console.log('route', routePath, basePath, stackItem.name);
     } else if (stackItem.name === 'router' || stackItem.name === 'bound dispatch') {
       parseEndpoints(stackItem.handle, routePath, endpoints)
     } else {
-      // console.log('middleWare', routePath, stackItem.name === '<anonymous>' ? stackItem.handle : stackItem.name );
-      if (stackRoute) {
-        stackRoute.middleWare = [...stackRoute.middleWare, stackItem.name];
-      } else {
-        endpoints.push(entry(routePath, [], [stackItem.name]));
-      }
+      console.log('middleWare', routePath, stackItem.name === '<anonymous>' ? stackItem.handle : stackItem.name );
+      middleWare = middleWare.concat(stackItem.name);
     }
-  })
+  });
+  
+  if (!hasRoute) {
+    endpoints.push(entry(routePath, [], middleWare));
+  }
 
   return endpoints
 }
