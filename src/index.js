@@ -63,6 +63,7 @@ var parseEndpoints = function (app, basePath, endpoints) {
   endpoints = endpoints || []
   basePath = basePath || ''
 
+  let stackRoute = undefined;
   stack.forEach(function (stackItem) {
     var routePath;
     if (stackItem.route) {
@@ -74,13 +75,18 @@ var parseEndpoints = function (app, basePath, endpoints) {
     }
 
     if (stackItem.route) {
-      endpoints.push(entry(routePath, getRouteMethods(stackItem.route)));
+      stackRoute = entry(routePath, getRouteMethods(stackItem.route));
+      endpoints.push(stackRoute);
       // console.log('route', routePath, basePath, stackItem.name);
     } else if (stackItem.name === 'router' || stackItem.name === 'bound dispatch') {
       parseEndpoints(stackItem.handle, routePath, endpoints)
     } else {
       // console.log('middleWare', routePath, stackItem.name === '<anonymous>' ? stackItem.handle : stackItem.name );
-      endpoints.push(entry(routePath, [], stackItem.name));
+      if (stackRoute) {
+        stackRoute.middleWare = [...stackRoute.middleWare, stackItem.name];
+      } else {
+        endpoints.push(entry(routePath, [], [stackItem.name]));
+      }
     }
   })
 
